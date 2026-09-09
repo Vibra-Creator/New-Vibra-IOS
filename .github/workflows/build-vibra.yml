@@ -144,17 +144,30 @@ jobs:
 
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
 
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode \
-            > profile.mobileprovision
+          echo "=== DECODIFICA PROFILO ==="
+
+          printf '%s' "$PROVISIONING_PROFILE_BASE64" | base64 --decode > profile.mobileprovision
+
+          echo "=== FILE CREATO ==="
+          ls -lh profile.mobileprovision
+          file profile.mobileprovision
+
+          echo "=== LETTURA PROFILO APPLE ==="
+
+          security cms -D -i profile.mobileprovision > profile.plist
+
+          echo "=== PROFILO DECODIFICATO ==="
+
+          /usr/libexec/PlistBuddy -c "Print:Name" profile.plist
+          /usr/libexec/PlistBuddy -c "Print:UUID" profile.plist
+          /usr/libexec/PlistBuddy -c "Print:TeamIdentifier:0" profile.plist
 
           PROFILE_UUID=$(
-            security cms -D -i profile.mobileprovision |
-            /usr/libexec/PlistBuddy -c "Print:UUID"
+            /usr/libexec/PlistBuddy -c "Print:UUID" profile.plist
           )
 
           PROFILE_NAME=$(
-            security cms -D -i profile.mobileprovision |
-            /usr/libexec/PlistBuddy -c "Print:Name"
+            /usr/libexec/PlistBuddy -c "Print:Name" profile.plist
           )
 
           cp profile.mobileprovision \
@@ -207,10 +220,13 @@ jobs:
           <dict>
               <key>method</key>
               <string>app-store</string>
+
               <key>signingStyle</key>
               <string>manual</string>
+
               <key>teamID</key>
               <string>MA8PHU39TR</string>
+
               <key>provisioningProfiles</key>
               <dict>
                   <key>com.vibraalienmatch</key>
