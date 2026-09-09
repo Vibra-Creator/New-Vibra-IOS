@@ -8,8 +8,10 @@ jobs:
     runs-on: macos-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
+
 
       - name: Extract ZIP
         run: |
@@ -25,37 +27,23 @@ jobs:
           echo "ZIP trovato: $ZIP_FILE"
 
           mkdir -p extracted
+
           unzip -q "$ZIP_FILE" -d extracted
 
           echo "=== CONTENUTO ESTRATTO ==="
           find extracted -maxdepth 5 -print
 
-      - name: Locate Xcode project
-        run: |
-          set -e
-
-          WORKSPACE=$(find extracted -type d -name "*.xcworkspace" | head -1)
-          PROJECT=$(find extracted -type d -name "*.xcodeproj" | head -1)
-
-          if [ -n "$WORKSPACE" ]; then
-            echo "WORKSPACE=$WORKSPACE" >> "$GITHUB_ENV"
-            echo "Trovato workspace: $WORKSPACE"
-          elif [ -n "$PROJECT" ]; then
-            echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
-            echo "Trovato project: $PROJECT"
-          else
-            echo "ERRORE: nessun progetto Xcode trovato"
-            exit 1
-          fi
 
       - name: Check Xcode
         run: |
           xcodebuild -version
 
+
       - name: Install CocoaPods
         run: |
           sudo gem install cocoapods
           pod --version
+
 
       - name: Install Pods
         run: |
@@ -63,24 +51,101 @@ jobs:
 
           if [ -n "$PODFILE" ]; then
             echo "Podfile trovato: $PODFILE"
+
             cd "$(dirname "$PODFILE")"
+
             pod install
+
+            echo "=== POD INSTALL COMPLETATO ==="
+            ls -la
           else
-            echo "Podfile non trovato"
+            echo "ERRORE: Podfile non trovato"
+            exit 1
           fi
+
+
+      - name: Locate Xcode project
+        run: |
+          set -e
+
+          echo "=== CERCO WORKSPACE COCOAPODS ==="
+
+          WORKSPACE=$(find extracted \
+            -type d \
+            -name "Vibra.xcworkspace" \
+            ! -path "*/Vibra.xcodeproj/*" \
+            | head -1)
+
+          PROJECT=$(find extracted \
+            -type d \
+            -name "Vibra.xcodeproj" \
+            | head -1)
+
+          if [ -n "$WORKSPACE" ]; then
+
+            echo "WORKSPACE=$WORKSPACE" >> "$GITHUB_ENV"
+
+            echo "Workspace trovato:"
+            echo "$WORKSPACE"
+
+          elif [ -n "$PROJECT" ]; then
+
+            echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+
+            echo "Project trovato:"
+            echo "$PROJECT"
+
+          else
+
+            echo "ERRORE: nessun progetto Xcode trovato"
+
+            echo "=== WORKSPACE ==="
+            find extracted -type d -name "*.xcworkspace" -print
+
+            echo "=== XCODEPROJ ==="
+            find extracted -type d -name "*.xcodeproj" -print
+
+            exit 1
+
+          fi
+
 
       - name: Show Xcode schemes
         run: |
+
+          echo "=== SCHEMI XCODE ==="
+
           if [ -n "$WORKSPACE" ]; then
-            xcodebuild -workspace "$WORKSPACE" -list
+
+            echo "Workspace:"
+            echo "$WORKSPACE"
+
+            xcodebuild \
+              -workspace "$WORKSPACE" \
+              -list
+
+          elif [ -n "$PROJECT" ]; then
+
+            echo "Project:"
+            echo "$PROJECT"
+
+            xcodebuild \
+              -project "$PROJECT" \
+              -list
+
           else
-            xcodebuild -project "$PROJECT" -list
+
+            echo "ERRORE: nessun workspace/project disponibile"
+            exit 1
+
           fi
+
 
       - name: Create signing keychain
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+
           security create-keychain \
             -p "$KEYCHAIN_PASSWORD" \
             build.keychain
@@ -93,8 +158,10 @@ jobs:
             -p "$KEYCHAIN_PASSWORD" \
             build.keychain
 
-          security list-keychains -d user -s \
-            build.keychain login.keychain-db
+          security list-keychains \
+            -d user \
+            -s build.keychain login.keychain-db
+
 
       - name: Import Apple Distribution certificate
         env:
@@ -102,14 +169,18 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+
           set -e
 
-          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          echo "$BUILD_CERTIFICATE_BASE64" \
+            | base64 --decode > certificate.p12
 
           echo "=== VERIFICA FILE P12 ==="
+
           ls -lh certificate.p12
 
           echo "=== VERIFICA PASSWORD P12 ==="
+
           openssl pkcs12 \
             -in certificate.p12 \
             -info \
@@ -133,41 +204,63 @@ jobs:
           echo "=== IDENTITA DISPONIBILI ==="
 
           security find-identity \
-            -v -p codesigning \
+            -v \
+            -p codesigning \
             build.keychain
+
 
       - name: Install provisioning profile
         env:
           PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
         run: |
+
           set -e
 
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p \
+            "$HOME/Library/MobileDevice/Provisioning Profiles"
 
           echo "=== DECODIFICA PROFILO ==="
 
-          printf '%s' "$PROVISIONING_PROFILE_BASE64" | base64 --decode > profile.mobileprovision
+          printf '%s' "$PROVISIONING_PROFILE_BASE64" \
+            | base64 --decode > profile.mobileprovision
 
           echo "=== FILE CREATO ==="
+
           ls -lh profile.mobileprovision
+
           file profile.mobileprovision
 
           echo "=== LETTURA PROFILO APPLE ==="
 
-          security cms -D -i profile.mobileprovision > profile.plist
+          security cms \
+            -D \
+            -i profile.mobileprovision \
+            > profile.plist
 
           echo "=== PROFILO DECODIFICATO ==="
 
-          /usr/libexec/PlistBuddy -c "Print:Name" profile.plist
-          /usr/libexec/PlistBuddy -c "Print:UUID" profile.plist
-          /usr/libexec/PlistBuddy -c "Print:TeamIdentifier:0" profile.plist
+          /usr/libexec/PlistBuddy \
+            -c "Print:Name" \
+            profile.plist
+
+          /usr/libexec/PlistBuddy \
+            -c "Print:UUID" \
+            profile.plist
+
+          /usr/libexec/PlistBuddy \
+            -c "Print:TeamIdentifier:0" \
+            profile.plist
 
           PROFILE_UUID=$(
-            /usr/libexec/PlistBuddy -c "Print:UUID" profile.plist
+            /usr/libexec/PlistBuddy \
+              -c "Print:UUID" \
+              profile.plist
           )
 
           PROFILE_NAME=$(
-            /usr/libexec/PlistBuddy -c "Print:Name" profile.plist
+            /usr/libexec/PlistBuddy \
+              -c "Print:Name" \
+              profile.plist
           )
 
           cp profile.mobileprovision \
@@ -176,48 +269,71 @@ jobs:
           echo "Profilo: $PROFILE_NAME"
           echo "UUID: $PROFILE_UUID"
 
+
       - name: Archive Vibra
         run: |
+
+          set -e
           set -o pipefail
+
           mkdir -p build
 
-          if [ -n "$WORKSPACE" ]; then
-            xcodebuild \
-              -workspace "$WORKSPACE" \
-              -scheme "Vibra" \
-              -configuration Release \
-              -sdk iphoneos \
-              -archivePath "$PWD/build/Vibra.xcarchive" \
-              DEVELOPMENT_TEAM="MA8PHU39TR" \
-              CODE_SIGN_STYLE="Manual" \
-              CODE_SIGN_IDENTITY="Apple Distribution" \
-              PROVISIONING_PROFILE_SPECIFIER="VibraAppStoreNew" \
-              PRODUCT_BUNDLE_IDENTIFIER="com.vibraalienmatch" \
-              clean archive \
-              | tee archive.log
-          else
-            xcodebuild \
-              -project "$PROJECT" \
-              -scheme "Vibra" \
-              -configuration Release \
-              -sdk iphoneos \
-              -archivePath "$PWD/build/Vibra.xcarchive" \
-              DEVELOPMENT_TEAM="MA8PHU39TR" \
-              CODE_SIGN_STYLE="Manual" \
-              CODE_SIGN_IDENTITY="Apple Distribution" \
-              PROVISIONING_PROFILE_SPECIFIER="VibraAppStoreNew" \
-              PRODUCT_BUNDLE_IDENTIFIER="com.vibraalienmatch" \
-              clean archive \
-              | tee archive.log
+          echo "=== CERCO IL WORKSPACE COCOAPODS ==="
+
+          WORKSPACE=$(find extracted \
+            -type d \
+            -name "Vibra.xcworkspace" \
+            ! -path "*/Vibra.xcodeproj/*" \
+            | head -1)
+
+          if [ -z "$WORKSPACE" ]; then
+
+            echo "ERRORE: workspace CocoaPods Vibra.xcworkspace non trovato"
+
+            echo "=== WORKSPACE TROVATI ==="
+
+            find extracted \
+              -type d \
+              -name "*.xcworkspace" \
+              -print
+
+            exit 1
           fi
+
+          echo "=== WORKSPACE CORRETTO ==="
+          echo "$WORKSPACE"
+
+          echo "=== ARCHIVE VIBRA ==="
+
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "Vibra" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/Vibra.xcarchive" \
+            DEVELOPMENT_TEAM="MA8PHU39TR" \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="VibraAppStoreNew" \
+            PRODUCT_BUNDLE_IDENTIFIER="com.vibraalienmatch" \
+            clean archive \
+            | tee archive.log
+
 
       - name: Create ExportOptions
         run: |
+
           cat > ExportOptions.plist <<'EOF'
+
           <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+          "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
           <plist version="1.0">
+
           <dict>
+
               <key>method</key>
               <string>app-store</string>
 
@@ -228,16 +344,25 @@ jobs:
               <string>MA8PHU39TR</string>
 
               <key>provisioningProfiles</key>
+
               <dict>
+
                   <key>com.vibraalienmatch</key>
                   <string>VibraAppStoreNew</string>
+
               </dict>
+
           </dict>
+
           </plist>
+
           EOF
+
 
       - name: Export IPA
         run: |
+
+          set -e
           set -o pipefail
 
           xcodebuild \
@@ -247,15 +372,19 @@ jobs:
             -exportOptionsPlist ExportOptions.plist \
             | tee export.log
 
+
       - name: Upload IPA
         uses: actions/upload-artifact@v4
+
         with:
           name: Vibra-iOS-IPA
           path: build/export/*.ipa
           if-no-files-found: error
 
+
       - name: Upload logs
         uses: actions/upload-artifact@v4
+
         with:
           name: Vibra-iOS-Build-Logs
           path: |
