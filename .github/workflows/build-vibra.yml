@@ -12,7 +12,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-
       - name: Extract ZIP
         run: |
           set -e
@@ -33,23 +32,21 @@ jobs:
           echo "=== CONTENUTO ESTRATTO ==="
           find extracted -maxdepth 5 -print
 
-
       - name: Check Xcode
         run: |
           xcodebuild -version
-
 
       - name: Install CocoaPods
         run: |
           sudo gem install cocoapods
           pod --version
 
-
       - name: Install Pods
         run: |
           PODFILE=$(find extracted -name "Podfile" -print -quit)
 
           if [ -n "$PODFILE" ]; then
+
             echo "Podfile trovato: $PODFILE"
 
             cd "$(dirname "$PODFILE")"
@@ -58,11 +55,13 @@ jobs:
 
             echo "=== POD INSTALL COMPLETATO ==="
             ls -la
+
           else
+
             echo "ERRORE: Podfile non trovato"
             exit 1
-          fi
 
+          fi
 
       - name: Locate Xcode project
         run: |
@@ -109,7 +108,6 @@ jobs:
 
           fi
 
-
       - name: Show Xcode schemes
         run: |
 
@@ -140,7 +138,6 @@ jobs:
 
           fi
 
-
       - name: Create signing keychain
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
@@ -161,7 +158,6 @@ jobs:
           security list-keychains \
             -d user \
             -s build.keychain login.keychain-db
-
 
       - name: Import Apple Distribution certificate
         env:
@@ -207,7 +203,6 @@ jobs:
             -v \
             -p codesigning \
             build.keychain
-
 
       - name: Install provisioning profile
         env:
@@ -269,6 +264,116 @@ jobs:
           echo "Profilo: $PROFILE_NAME"
           echo "UUID: $PROFILE_UUID"
 
+      - name: Disable signing for CocoaPods
+        run: |
+
+          set -e
+
+          echo "=== DISABILITO CODE SIGNING DEI PODS ==="
+
+          PODS_PROJECT=$(find extracted \
+            -type f \
+            -path "*/Pods/Pods.xcodeproj/project.pbxproj" \
+            | head -1)
+
+          if [ -z "$PODS_PROJECT" ]; then
+
+            echo "ERRORE: Pods.xcodeproj non trovato"
+            exit 1
+
+          fi
+
+          echo "Pods project:"
+          echo "$PODS_PROJECT"
+
+          python3 <<PY
+          from pathlib import Path
+
+          path = Path("$PODS_PROJECT")
+
+          text = path.read_text()
+
+          text = text.replace(
+              "CODE_SIGNING_ALLOWED = YES;",
+              "CODE_SIGNING_ALLOWED = NO;"
+          )
+
+          text = text.replace(
+              "CODE_SIGNING_REQUIRED = YES;",
+              "CODE_SIGNING_REQUIRED = NO;"
+          )
+
+          text = text.replace(
+              "CODE_SIGN_STYLE = Manual;",
+              "CODE_SIGN_STYLE = Automatic;"
+          )
+
+          text = text.replace(
+              "PROVISIONING_PROFILE_SPECIFIER = VibraAppStoreNew;",
+              "PROVISIONING_PROFILE_SPECIFIER = \"\";"
+          )
+
+          text = text.replace(
+              "PROVISIONING_PROFILE = VibraAppStoreNew;",
+              "PROVISIONING_PROFILE = \"\";"
+          )
+
+          path.write_text(text)
+
+          print("Signing Pods disabilitato.")
+          PY
+
+          echo "=== VERIFICA PODS ==="
+
+          grep -n "CODE_SIGNING_ALLOWED" "$PODS_PROJECT" | head -20 || true
+
+      - name: Configure Vibra signing
+        run: |
+
+          set -e
+
+          echo "=== CONFIGURO FIRMA APP VIBRA ==="
+
+          VIBRA_PROJECT=$(find extracted \
+            -type f \
+            -path "*/Vibra.xcodeproj/project.pbxproj" \
+            | head -1)
+
+          if [ -z "$VIBRA_PROJECT" ]; then
+
+            echo "ERRORE: project.pbxproj Vibra non trovato"
+            exit 1
+
+          fi
+
+          echo "Project Vibra:"
+          echo "$VIBRA_PROJECT"
+
+          python3 <<PY
+          from pathlib import Path
+
+          path = Path("$VIBRA_PROJECT")
+
+          text = path.read_text()
+
+          text = text.replace(
+              "DEVELOPMENT_TEAM = \"\";",
+              "DEVELOPMENT_TEAM = MA8PHU39TR;"
+          )
+
+          text = text.replace(
+              "CODE_SIGN_STYLE = Automatic;",
+              "CODE_SIGN_STYLE = Manual;"
+          )
+
+          path.write_text(text)
+
+          print("Configurazione signing Vibra completata.")
+          PY
+
+          echo "=== CONTROLLO TEAM ==="
+
+          grep -n "DEVELOPMENT_TEAM" "$VIBRA_PROJECT" | head -20 || true
 
       - name: Archive Vibra
         run: |
@@ -278,7 +383,7 @@ jobs:
 
           mkdir -p build
 
-          echo "=== CERCO IL WORKSPACE COCOAPODS ==="
+          echo "=== CERCO WORKSPACE COCOAPODS ==="
 
           WORKSPACE=$(find extracted \
             -type d \
@@ -298,6 +403,7 @@ jobs:
               -print
 
             exit 1
+
           fi
 
           echo "=== WORKSPACE CORRETTO ==="
@@ -314,11 +420,28 @@ jobs:
             DEVELOPMENT_TEAM="MA8PHU39TR" \
             CODE_SIGN_STYLE="Manual" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="VibraAppStoreNew" \
             PRODUCT_BUNDLE_IDENTIFIER="com.vibraalienmatch" \
+            CODE_SIGNING_ALLOWED="YES" \
             clean archive \
             | tee archive.log
 
+      - name: Check Archive
+        run: |
+
+          set -e
+
+          echo "=== CONTROLLO ARCHIVIO ==="
+
+          if [ ! -d "build/Vibra.xcarchive" ]; then
+
+            echo "ERRORE: archivio non creato"
+
+            exit 1
+
+          fi
+
+          echo "Archivio trovato:"
+          ls -lah build/Vibra.xcarchive
 
       - name: Create ExportOptions
         run: |
@@ -358,12 +481,17 @@ jobs:
 
           EOF
 
+          echo "=== EXPORT OPTIONS ==="
+
+          cat ExportOptions.plist
 
       - name: Export IPA
         run: |
 
           set -e
           set -o pipefail
+
+          echo "=== ESPORTAZIONE IPA ==="
 
           xcodebuild \
             -exportArchive \
@@ -372,6 +500,9 @@ jobs:
             -exportOptionsPlist ExportOptions.plist \
             | tee export.log
 
+          echo "=== FILE ESPORTATI ==="
+
+          find build/export -maxdepth 2 -type f -print
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
@@ -380,7 +511,6 @@ jobs:
           name: Vibra-iOS-IPA
           path: build/export/*.ipa
           if-no-files-found: error
-
 
       - name: Upload logs
         uses: actions/upload-artifact@v4
