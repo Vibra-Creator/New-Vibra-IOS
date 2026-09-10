@@ -13,7 +13,7 @@ jobs:
 
     - name: Unzip project
       run: |
-        unzip Vibra.zip -d project
+        unzip "Vibra (8).zip" -d project
 
     - name: Install CocoaPods
       run: |
