@@ -18,12 +18,12 @@ jobs:
     - name: Install CocoaPods
       run: |
         sudo gem install cocoapods
-        cd project/src
+        cd "project/Vibra (8)/src"
         pod install
 
     - name: Create exportOptions.plist
       run: |
-        cat <<EOF > project/src/exportOptions.plist
+        cat <<EOF > "project/Vibra (8)/src/exportOptions.plist"
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -47,7 +47,7 @@ jobs:
 
     - name: Build archive
       run: |
-        cd project/src
+        cd "project/Vibra (8)/src"
         xcodebuild \
           -workspace Vibra.xcworkspace \
           -scheme Vibra \
@@ -57,7 +57,7 @@ jobs:
 
     - name: Export unsigned IPA
       run: |
-        cd project/src
+        cd "project/Vibra (8)/src"
         xcodebuild \
           -exportArchive \
           -archivePath build/Vibra.xcarchive \
@@ -79,7 +79,7 @@ jobs:
 
     - name: Re-sign IPA
       run: |
-        cd project/src/build/ipa
+        cd "project/Vibra (8)/src/build/ipa"
         mkdir Payload
         unzip Vibra.ipa -d Payload
         codesign -f -s "Apple Distribution" Payload/Payload/Vibra.app
@@ -89,4 +89,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SignedVibra
-        path: project/src/build/ipa/SignedVibra.ipa
+        path: "project/Vibra (8)/src/build/ipa/SignedVibra.ipa"
