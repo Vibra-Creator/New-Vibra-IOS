@@ -1,1 +1,98 @@
+name: Build iOS IPA
 
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Unzip project
+      run: |
+        unzip "Vibra.zip" -d project
+
+    - name: Find project folder (Podfile)
+      run: |
+        PROJECT_DIR=$(find project -type f -name "Podfile" -exec dirname {} \;)
+        echo "PROJECT_DIR=$PROJECT_DIR"
+        echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+    - name: Install CocoaPods
+      run: |
+        sudo gem install cocoapods
+        cd "$PROJECT_DIR"
+        pod install
+
+    - name: Create exportOptions.plist
+      run: |
+        cat <<EOF > "$PROJECT_DIR/exportOptions.plist"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>method</key>
+          <string>ad-hoc</string>
+          <key>signingStyle</key>
+          <string>manual</string>
+          <key>compileBitcode</key>
+          <false/>
+          <key>destination</key>
+          <string>export</string>
+          <key>provisioningProfiles</key>
+          <dict>
+            <key>com.vibraalienmatch</key>
+            <string>Vibra</string>
+          </dict>
+        </dict>
+        </plist>
+        EOF
+
+    - name: Build archive
+      run: |
+        cd "$PROJECT_DIR"
+        xcodebuild \
+          -workspace Vibra.xcworkspace \
+          -scheme Vibra \
+          -configuration Release \
+          -archivePath build/Vibra.xcarchive \
+          archive
+
+    - name: Export unsigned IPA
+      run: |
+        cd "$PROJECT_DIR"
+        xcodebuild \
+          -exportArchive \
+          -archivePath build/Vibra.xcarchive \
+          -exportPath build/ipa \
+          -exportOptionsPlist exportOptions.plist
+
+    - name: Decode certificate
+      run: |
+        echo "$IOS_CERT" | base64 --decode > ios_cert.p12
+
+    - name: Install certificate
+      run: |
+        security import ios_cert.p12 -P "$IOS_CERT_PASSWORD" -A
+
+    - name: Install provisioning profile
+      run: |
+        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        echo "$IOS_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/Vibra.mobileprovision
+
+    - name: Re-sign IPA
+      run: |
+        cd "$PROJECT_DIR/build/ipa"
+        mkdir Payload
+        unzip Vibra.ipa -d Payload
+        codesign -f -s "Apple Distribution" Payload/Payload/Vibra.app
+        zip -r SignedVibra.ipa Payload
+
+    - name: Upload IPA artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SignedVibra
+        path: "$PROJECT_DIR/build/ipa/SignedVibra.ipa"
