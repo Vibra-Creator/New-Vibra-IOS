@@ -15,15 +15,21 @@ jobs:
       run: |
         unzip "Vibra.zip" -d project
 
+    - name: Find project folder (Podfile)
+      run: |
+        PROJECT_DIR=$(find project -type f -name "Podfile" -exec dirname {} \;)
+        echo "PROJECT_DIR=$PROJECT_DIR"
+        echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
     - name: Install CocoaPods
       run: |
         sudo gem install cocoapods
-        cd project
+        cd "$PROJECT_DIR"
         pod install
 
     - name: Create exportOptions.plist
       run: |
-        cat <<EOF > project/exportOptions.plist
+        cat <<EOF > "$PROJECT_DIR/exportOptions.plist"
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -47,7 +53,7 @@ jobs:
 
     - name: Build archive
       run: |
-        cd project
+        cd "$PROJECT_DIR"
         xcodebuild \
           -workspace Vibra.xcworkspace \
           -scheme Vibra \
@@ -57,7 +63,7 @@ jobs:
 
     - name: Export unsigned IPA
       run: |
-        cd project
+        cd "$PROJECT_DIR"
         xcodebuild \
           -exportArchive \
           -archivePath build/Vibra.xcarchive \
@@ -79,7 +85,7 @@ jobs:
 
     - name: Re-sign IPA
       run: |
-        cd project/build/ipa
+        cd "$PROJECT_DIR/build/ipa"
         mkdir Payload
         unzip Vibra.ipa -d Payload
         codesign -f -s "Apple Distribution" Payload/Payload/Vibra.app
@@ -89,4 +95,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SignedVibra
-        path: project/build/ipa/SignedVibra.ipa
+        path: "$PROJECT_DIR/build/ipa/SignedVibra.ipa"
