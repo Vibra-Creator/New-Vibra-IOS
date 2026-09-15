@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build iOS IPA (Manual Signing)
 
 on:
   workflow_dispatch:
@@ -11,21 +11,36 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    # Install certificate (.p12)
+    - name: Install signing certificate
+      run: |
+        echo "${IOS_CERT_P12}" | base64 --decode > cert.p12
+        security import cert.p12 -P "${IOS_CERT_PASSWORD}" -A
+      env:
+        IOS_CERT_P12: ${{ secrets.IOS_CERT_P12 }}
+        IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+
+    # Install provisioning profile (.mobileprovision)
+    - name: Install provisioning profile
+      run: |
+        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        echo "${IOS_PROFILE}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/VibraStore.mobileprovision
+      env:
+        IOS_PROFILE: ${{ secrets.IOS_PROFILE }}
+
+    # Unzip project
     - name: Unzip Vibra.zip
       run: unzip "Vibra.zip" -d project
 
-    - name: Enter Vibra folder
-      run: |
-        cd project/Vibra
-        ls -la
-
+    # Install CocoaPods
     - name: Install CocoaPods
       run: |
         cd project/Vibra
         sudo gem install cocoapods
         pod install
 
-    - name: Build archive (with automatic signing)
+    # Build archive with MANUAL SIGNING
+    - name: Build archive
       run: |
         cd project/Vibra
         xcodebuild \
@@ -33,5 +48,4 @@ jobs:
           -scheme Vibra \
           -configuration Release \
           -archivePath build/Vibra.xcarchive \
-          -allowProvisioningUpdates \
-          archive
+          CODE
