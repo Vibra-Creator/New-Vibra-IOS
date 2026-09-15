@@ -11,23 +11,23 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Unzip Vibrax
-      run: unzip "Vibrax.zip" -d project
+    - name: Unzip Vibra.zip
+      run: unzip "Vibra.zip" -d project
 
-    - name: Enter Vibrax folder
+    - name: Enter Vibra folder
       run: |
-        cd project/Vibrax
+        cd project/Vibra
         ls -la
 
     - name: Install CocoaPods
       run: |
-        cd project/Vibrax
+        cd project/Vibra
         sudo gem install cocoapods
         pod install
 
     - name: Build archive
       run: |
-        cd project/Vibrax
+        cd project/Vibra
         xcodebuild \
           -workspace Vibra.xcworkspace \
           -scheme Vibra \
