@@ -1,4 +1,4 @@
-name: Build iOS
+name: Build iOS App Store
 
 on:
   workflow_dispatch:
@@ -11,38 +11,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Decode and install certificate
+      - name: Decode and install Distribution certificate
         run: |
           echo "$IOS_CERT" | base64 --decode > certificate.p12
           security import certificate.p12 -P "$IOS_CERT_PASSWORD" -A
 
-      - name: Decode provisioning profile
+      - name: Install App Store provisioning profile
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$IOS_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/VibraStore.mobileprovision
+          echo "$IOS_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/AppStore.mobileprovision
 
       - name: Install dependencies
         run: |
           npm install
           npm run build
 
-      - name: Build iOS app
+      - name: Sync Capacitor
         run: |
           npx cap sync ios
+
+      - name: Build archive
+        run: |
           xcodebuild -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Release \
             -archivePath build/App.xcarchive archive
 
-      - name: Export IPA
+      - name: Export IPA for App Store
         run: |
           xcodebuild -exportArchive \
             -archivePath build/App.xcarchive \
             -exportPath build \
             -exportOptionsPlist ios/exportOptions.plist
 
-      - name: Upload IPA
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v3
         with:
-          name: Vibra-IPA
+          name: Vibra-AppStore
           path: build/*.ipa
