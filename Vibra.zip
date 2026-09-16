@@ -14,9 +14,16 @@ jobs:
     - name: Decode certificate
       run: echo "${IOS_CERT}" | base64 --decode > cert.p12
 
+    - name: Create keychain
+      run: |
+        security create-keychain -p "" build.keychain
+        security set-keychain-settings build.keychain
+        security unlock-keychain -p "" build.keychain
+
     - name: Import certificate
       run: |
-        security import cert.p12 -k ~/Library/Keychains/login.keychain-db -P "${IOS_CERT_PASSWORD}" -T /usr/bin/codesign
+        security import cert.p12 -k build.keychain -P "${IOS_CERT_PASSWORD}" -T /usr/bin/codesign
+        security list-keychains -s build.keychain
 
     - name: Install provisioning profile
       run: |
