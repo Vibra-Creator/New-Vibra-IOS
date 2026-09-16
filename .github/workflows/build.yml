@@ -1,51 +1,51 @@
-name: Build iOS IPA (Manual Signing)
+name: Build iOS App Store
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-ios:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # Install certificate (.p12)
-    - name: Install signing certificate
-      run: |
-        echo "${IOS_CERT_P12}" | base64 --decode > cert.p12
-        security import cert.p12 -P "${IOS_CERT_PASSWORD}" -A
-      env:
-        IOS_CERT_P12: ${{ secrets.IOS_CERT_P12 }}
-        IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+      - name: Decode and install Distribution certificate
+        run: |
+          echo "${IOS_CERT}" | base64 --decode > cert.p12
+          security import cert.p12 -P "${IOS_CERT_PASSWORD}" -A
 
-    # Install provisioning profile (.mobileprovision)
-    - name: Install provisioning profile
-      run: |
-        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        echo "${IOS_PROFILE}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/VibraStore.mobileprovision
-      env:
-        IOS_PROFILE: ${{ secrets.IOS_PROFILE }}
+      - name: Install App Store provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${IOS_PROFILE}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/AppStore.mobileprovision
 
-    # Unzip project
-    - name: Unzip Vibra.zip
-      run: unzip "Vibra.zip" -d project
+      - name: Install dependencies
+        run: |
+          npm install
+          npm run build
 
-    # Install CocoaPods
-    - name: Install CocoaPods
-      run: |
-        cd project/Vibra
-        sudo gem install cocoapods
-        pod install
+      - name: Sync Capacitor
+        run: |
+          npx cap sync ios
 
-    # Build archive with MANUAL SIGNING
-    - name: Build archive
-      run: |
-        cd project/Vibra
-        xcodebuild \
-          -workspace Vibra.xcworkspace \
-          -scheme Vibra \
-          -configuration Release \
-          -archivePath build/Vibra.xcarchive \
-          CODE
+      - name: Build archive
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath build/App.xcarchive archive
+
+      - name: Export IPA for App Store
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build \
+            -exportOptionsPlist ios/exportOptions.plist
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Vibra-AppStore
+          path: build/*.ipa
