@@ -11,8 +11,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Debug files (IMPORTANTISSIMO)
+      - name: Debug files
         run: ls -la
+
+      - name: Verify certificate/key match
+        run: |
+          echo "CERT MODULUS:"
+          openssl x509 -noout -modulus -in distribution.cer
+          echo "KEY MODULUS:"
+          openssl rsa -noout -modulus -in private.key
 
       - name: Create keychain
         run: |
