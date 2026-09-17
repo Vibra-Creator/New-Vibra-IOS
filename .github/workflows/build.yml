@@ -53,16 +53,16 @@ jobs:
       - name: Check project exists
         run: |
           echo "Checking project:"
-          ls -la
-          if [ ! -d "Vibra.xcodeproj" ]; then
-            echo "❌ Vibra.xcodeproj NOT FOUND"
+          ls -la Vibra
+          if [ ! -d "Vibra/Vibra.xcodeproj" ]; then
+            echo "❌ Vibra.xcodeproj NOT FOUND inside Vibra/"
             exit 1
           fi
 
       - name: Build
         run: |
           xcodebuild \
-            -project Vibra.xcodeproj \
+            -project Vibra/Vibra.xcodeproj \
             -scheme Vibra \
             -configuration Release \
             -archivePath build/Vibra.xcarchive \
