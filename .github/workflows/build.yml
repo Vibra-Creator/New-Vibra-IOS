@@ -21,6 +21,12 @@ jobs:
           echo "KEY MODULUS:"
           openssl rsa -noout -modulus -in private.key
 
+      - name: Convert private key to PKCS8
+        run: |
+          openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
+            -in private.key \
+            -out private_pkcs8.key
+
       - name: Create keychain
         run: |
           security create-keychain -p "" build.keychain
@@ -30,7 +36,7 @@ jobs:
       - name: Import certificate
         run: |
           openssl pkcs12 -export \
-            -inkey private.key \
+            -inkey private_pkcs8.key \
             -in distribution.cer \
             -out cert.p12 \
             -passout pass:vibra2024
