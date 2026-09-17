@@ -18,7 +18,7 @@ jobs:
           -inkey private.key \
           -in distribution.cer \
           -out cert.p12 \
-          -passout pass:1234
+          -passout pass:vibra2024
 
     # 🔹 Crea e sblocca il keychain temporaneo
     - name: Create keychain
@@ -30,7 +30,7 @@ jobs:
     # 🔹 Importa il certificato nel keychain
     - name: Import certificate
       run: |
-        security import cert.p12 -k build.keychain -P "1234" -T /usr/bin/codesign
+        security import cert.p12 -k build.keychain -P "vibra2024" -T /usr/bin/codesign
         security list-keychains -s build.keychain
 
     # 🔹 Installa il provisioning profile
