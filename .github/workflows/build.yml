@@ -1,64 +1,25 @@
-name: iOS Build
+name: Generate CSR
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  generate:
     runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Debug files
-        run: ls -la
-
-      - name: Verify certificate/key match
+      - name: Generate private key and CSR
         run: |
-          echo "CERT MODULUS:"
-          openssl x509 -noout -modulus -in distribution.cer
-          echo "KEY MODULUS:"
-          openssl rsa -noout -modulus -in private.key
+          openssl genrsa -out private.key 2048
+          openssl req -new -key private.key -out request.csr -subj "/CN=Vibra"
 
-      - name: Convert private key to PKCS8
-        run: |
-          openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
-            -in private.key \
-            -out private_pkcs8.key
-
-      - name: Create keychain
-        run: |
-          security create-keychain -p "" build.keychain
-          security set-keychain-settings build.keychain
-
-      - name: Unlock keychain
-        run: |
-          security unlock-keychain -p "" build.keychain
-
-      - name: Import certificate
-        run: |
-          openssl pkcs12 -export \
-            -inkey private_pkcs8.key \
-            -in distribution.cer \
-            -out cert.p12 \
-            -passout pass:vibra2024
-
-          security import cert.p12 -k build.keychain -P "vibra2024" -T /usr/bin/codesign
-
-      - name: Install provisioning profile
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp VibraStore.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
-
-      - name: Unzip project
-        run: unzip Vibra.zip -d .
-
-      - name: Build
-        run: |
-          xcodebuild \
-            -project Vibra.xcodeproj \
-            -scheme Vibra \
-            -configuration Release \
-            -archivePath build/Vibra.xcarchive \
-            archive
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibra-cert-files
+          path: |
+            private.key
+            request.csr
