@@ -19,10 +19,11 @@ jobs:
         security create-keychain -p "" build.keychain
         security set-keychain-settings build.keychain
         security unlock-keychain -p "" build.keychain
-- name: Check certificate file
-  run: |
-    ls -l cert.p12
-    file cert.p12
+
+    - name: Check certificate file
+      run: |
+        ls -l cert.p12
+        file cert.p12
 
     - name: Import certificate
       run: |
