@@ -1,25 +1,60 @@
-name: Generate CSR
+name: iOS Build
 
 on:
   workflow_dispatch:
 
 jobs:
-  generate:
+  build:
     runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Generate private key and CSR
-        run: |
-          openssl genrsa -out private.key 2048
-          openssl req -new -key private.key -out request.csr -subj "/CN=Vibra"
+      - name: Debug files
+        run: ls -la
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: vibra-cert-files
-          path: |
-            private.key
-            request.csr
+      - name: Verify certificate/key match
+        run: |
+          echo "CERT MODULUS:"
+          openssl x509 -noout -modulus -in distribution.cer
+          echo "KEY MODULUS:"
+          openssl rsa -noout -modulus -in private.key
+
+      - name: Create keychain
+        run: |
+          security create-keychain -p "" build.keychain
+          security set-keychain-settings build.keychain
+          security unlock-keychain -p "" build.keychain
+
+      - name: Export P12 (OpenSSL 3 fix)
+        run: |
+          openssl pkcs12 -export -legacy \
+            -inkey private.key \
+            -in distribution.cer \
+            -out cert.p12 \
+            -passout pass:vibra2024
+
+      - name: Import certificate into keychain
+        run: |
+          security import cert.p12 \
+            -k build.keychain \
+            -P "vibra2024" \
+            -T /usr/bin/codesign
+
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp VibraStore.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Unzip project
+        run: unzip Vibra.zip -d .
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project Vibra.xcodeproj \
+            -scheme Vibra \
+            -configuration Release \
+            -archivePath build/Vibra.xcarchive \
+            archive
