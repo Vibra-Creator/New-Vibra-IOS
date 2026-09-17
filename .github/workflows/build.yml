@@ -50,6 +50,15 @@ jobs:
       - name: Unzip project
         run: unzip Vibra.zip -d .
 
+      - name: Check project exists
+        run: |
+          echo "Checking project:"
+          ls -la
+          if [ ! -d "Vibra.xcodeproj" ]; then
+            echo "❌ Vibra.xcodeproj NOT FOUND"
+            exit 1
+          fi
+
       - name: Build
         run: |
           xcodebuild \
