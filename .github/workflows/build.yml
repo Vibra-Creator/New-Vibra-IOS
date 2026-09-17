@@ -1,54 +1,27 @@
-name: iOS Build
+name: Generate CSR
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  generate:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-
-    # 🔹 Genera il certificato P12 direttamente su macOS
-    - name: Generate P12 on macOS
+    - name: Generate private key
       run: |
-        openssl pkcs12 -export \
-          -inkey private.key \
-          -in distribution.cer \
-          -out cert.p12 \
-          -passout pass:vibra2024
+        openssl genrsa -out private.key 2048
+        ls -l private.key
 
-    # 🔹 Crea e sblocca il keychain temporaneo
-    - name: Create keychain
+    - name: Generate CSR
       run: |
-        security create-keychain -p "" build.keychain
-        security set-keychain-settings build.keychain
-        security unlock-keychain -p "" build.keychain
+        openssl req -new -key private.key -out request.csr -subj "/CN=Fabio"
+        cat request.csr
 
-    # 🔹 Importa il certificato nel keychain
-    - name: Import certificate
-      run: |
-        security import cert.p12 -k build.keychain -P "vibra2024" -T /usr/bin/codesign
-        security list-keychains -s build.keychain
-
-    # 🔹 Installa il provisioning profile
-    - name: Install provisioning profile
-      run: |
-        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        cp VibraStore.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
-
-    # 🔹 Estrae il progetto
-    - name: Unzip project
-      run: unzip Vibra.zip -d .
-
-    # 🔹 Compila e archivia l’app
-    - name: Build
-      run: |
-        xcodebuild \
-          -workspace Vibra.xcworkspace \
-          -scheme Vibra \
-          -configuration Release \
-          -archivePath build/Vibra.xcarchive \
-          archive
+    - name: Upload key and CSR as artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ios-cert-files
+        path: |
+          private.key
+          request.csr
