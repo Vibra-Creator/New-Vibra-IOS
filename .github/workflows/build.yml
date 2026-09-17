@@ -8,41 +8,41 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Generate P12 on macOS
-      run: |
-        openssl pkcs12 -export \
-          -inkey private.key \
-          -in distribution.cer \
-          -out cert.p12 \
-          -passout pass:vibra2024
+      - name: Debug files (IMPORTANTISSIMO)
+        run: ls -la
 
-    - name: Create keychain
-      run: |
-        security create-keychain -p "" build.keychain
-        security set-keychain-settings build.keychain
-        security unlock-keychain -p "" build.keychain
+      - name: Create keychain
+        run: |
+          security create-keychain -p "" build.keychain
+          security set-keychain-settings build.keychain
+          security unlock-keychain build.keychain
 
-    - name: Import certificate
-      run: |
-        security import cert.p12 -k build.keychain -P "vibra2024" -T /usr/bin/codesign
-        security list-keychains -s build.keychain
+      - name: Import certificate
+        run: |
+          openssl pkcs12 -export \
+            -inkey private.key \
+            -in distribution.cer \
+            -out cert.p12 \
+            -passout pass:vibra2024
 
-    - name: Install provisioning profile
-      run: |
-        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        cp VibraStore.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          security import cert.p12 -k build.keychain -P "vibra2024" -T /usr/bin/codesign
 
-    - name: Unzip project
-      run: unzip Vibra.zip -d .
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp VibraStore.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
 
-    - name: Build
-      run: |
-        xcodebuild \
-          -workspace Vibra.xcworkspace \
-          -scheme Vibra \
-          -configuration Release \
-          -archivePath build/Vibra.xcarchive \
-          archive
+      - name: Unzip project
+        run: unzip Vibra.zip -d .
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project Vibra.xcodeproj \
+            -scheme Vibra \
+            -configuration Release \
+            -archivePath build/Vibra.xcarchive \
+            archive
